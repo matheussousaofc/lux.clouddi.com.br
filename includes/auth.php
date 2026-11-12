@@ -1,61 +1,27 @@
 <?php
 // Conexão e controle de sessão/permissões do sistema
-require_once __DIR__ . '/db.php';
+
+function getDB(): PDO
+{
+    static $pdo = null;
+    if ($pdo === null) {
+        $host = 'localhost';
+        $db   = 'u121600320_lux';
+        $user = 'u121600320_admin3';     // ajuste conforme seu hPanel
+        $pass = '@Entw9gtk953157';         // ajuste conforme seu hPanel
+        $pdo = new PDO("mysql:host=$host;dbname=$db;charset=utf8mb4", $user, $pass, [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+        ]);
+    }
+    return $pdo;
+}
 
 function iniciarSessao(): void
 {
     if (session_status() === PHP_SESSION_NONE) {
         session_start();
     }
-}
-
-function configuracaoAmbiente(string $nome): ?string
-{
-    $valor = getenv($nome);
-    if (is_string($valor) && $valor !== '') {
-        return $valor;
-    }
-
-    foreach ([$_SERVER, $_ENV] as $origem) {
-        $valor = $origem[$nome] ?? null;
-        if (is_string($valor) && $valor !== '') {
-            return $valor;
-        }
-    }
-
-    return null;
-}
-
-/**
- * Autentica o usuário master com credenciais configuradas no ambiente.
- */
-function loginMaster(string $email, string $senha): bool
-{
-    $emailConfigurado = configuracaoAmbiente('MASTER_EMAIL');
-    $hashSenhaConfigurado = configuracaoAmbiente('MASTER_PASSWORD_HASH');
-
-    if (
-        $emailConfigurado === null
-        || $hashSenhaConfigurado === null
-    ) {
-        error_log('Autenticação master indisponível: configure MASTER_EMAIL e MASTER_PASSWORD_HASH.');
-        return false;
-    }
-
-    if (
-        !hash_equals(strtolower(trim($emailConfigurado)), strtolower(trim($email)))
-        || !password_verify($senha, $hashSenhaConfigurado)
-    ) {
-        return false;
-    }
-
-    iniciarSessao();
-    session_regenerate_id(true);
-    $_SESSION = [];
-    $_SESSION['tipo'] = 'master';
-    $_SESSION['nome'] = $emailConfigurado;
-
-    return true;
 }
 
 /** Bloqueia acesso a quem não é master */
@@ -95,27 +61,28 @@ function companyIdDoOwner(): int
 function logout(): void
 {
     iniciarSessao();
-
-    $destino = ($_SESSION['tipo'] ?? '') === 'master'
-        ? '/master/login.php'
-        : '/owner/login.php';
-
     $_SESSION = [];
+    session_destroy();
+    header('Location: /index.php');
+    exit;
+}
 
-    if (ini_get('session.use_cookies')) {
-        $parametros = session_get_cookie_params();
-        setcookie(
-            session_name(),
-            '',
-            time() - 42000,
-            $parametros['path'],
-            $parametros['domain'],
-            $parametros['secure'],
-            $parametros['httponly']
-        );
+/** Autentica um usuário master e preenche a sessão. Retorna true/false. */
+function loginMaster(string $email, string $senha): bool
+{
+    iniciarSessao();
+    $pdo = getDB();
+
+    $stmt = $pdo->prepare('SELECT * FROM master_users WHERE email = ?');
+    $stmt->execute([$email]);
+    $master = $stmt->fetch();
+
+    if ($master && password_verify($senha, $master['senha_hash'])) {
+        $_SESSION['tipo']      = 'master';
+        $_SESSION['master_id'] = (int) $master['id'];
+        $_SESSION['nome']      = $master['nome'];
+        return true;
     }
 
-    session_destroy();
-    header('Location: ' . $destino);
-    exit;
+    return false;
 }
