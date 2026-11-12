@@ -1,3 +1,4 @@
 .env
 .env.*
 /uploads/
+/includes/config.local.php

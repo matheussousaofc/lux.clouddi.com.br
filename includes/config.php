@@ -19,20 +19,34 @@ function obterConfiguracao(string $nome): ?string
     return null;
 }
 
-$configuracaoLocal = [];
-$arquivoConfiguracao = obterConfiguracao('LUX_CONFIG_FILE');
-if ($arquivoConfiguracao === null) {
-    $arquivoConfiguracao = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lux-erp-config.php';
-}
+function carregarConfiguracaoLocal(): array
+{
+    $arquivos = [];
+    $arquivoAmbiente = obterConfiguracao('LUX_CONFIG_FILE');
+    if ($arquivoAmbiente !== null) {
+        $arquivos[] = $arquivoAmbiente;
+    }
 
-if (is_file($arquivoConfiguracao) && is_readable($arquivoConfiguracao)) {
-    $configuracaoCarregada = require $arquivoConfiguracao;
-    if (is_array($configuracaoCarregada)) {
-        $configuracaoLocal = $configuracaoCarregada;
-    } else {
+    $arquivos[] = __DIR__ . DIRECTORY_SEPARATOR . 'config.local.php';
+    $arquivos[] = dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'lux-erp-config.php';
+
+    foreach (array_unique($arquivos) as $arquivo) {
+        if (!is_file($arquivo) || !is_readable($arquivo)) {
+            continue;
+        }
+
+        $configuracao = require $arquivo;
+        if (is_array($configuracao)) {
+            return $configuracao;
+        }
+
         error_log('O arquivo de configuração local do Lux ERP deve retornar um array.');
     }
+
+    return [];
 }
+
+$configuracaoLocal = carregarConfiguracaoLocal();
 
 function obterConfiguracaoBanco(string $nome, array $configuracaoLocal): string
 {
