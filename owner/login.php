@@ -6,14 +6,16 @@ $pdo = getDB();
 $erro = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    exigirTokenCsrf();
     $email = trim($_POST['email'] ?? '');
     $senha = $_POST['senha'] ?? '';
 
-    $stmt = $pdo->prepare('SELECT * FROM owner_users WHERE email = ?');
+    $stmt = $pdo->prepare('SELECT * FROM owner_users WHERE email = ? AND ativo = 1 LIMIT 1');
     $stmt->execute([$email]);
     $owner = $stmt->fetch();
 
     if ($owner && password_verify($senha, $owner['senha_hash'])) {
+        renovarSessaoAposLogin();
         $_SESSION['tipo']       = 'owner';
         $_SESSION['owner_id']   = (int) $owner['id'];
         $_SESSION['nome']       = $owner['nome'];
@@ -45,6 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <?php endif; ?>
 
   <form method="POST" class="space-y-4">
+    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(tokenCsrf(), ENT_QUOTES, 'UTF-8') ?>">
     <div>
       <label class="block text-sm font-medium text-gray-700 mb-1">E-mail</label>
       <input type="email" name="email" required class="w-full border rounded px-3 py-2">

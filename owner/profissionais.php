@@ -5,6 +5,10 @@ exigirOwner();
 $pdo = getDB();
 $companyId = companyIdDoOwner();
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    exigirTokenCsrf();
+}
+
 $erro = '';
 $sucesso = '';
 
@@ -13,25 +17,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['acao'] ?? '') === 'criar_p
     $nome  = trim($_POST['nome'] ?? '');
     $email = trim($_POST['email'] ?? '');
     $senha = $_POST['senha'] ?? '';
+    $podeGerenciarAgendaGeral = isset($_POST['pode_gerenciar_agenda_geral']) ? 1 : 0;
 
-    if ($nome === '' || $email === '' || $senha === '') {
+    if ($nome === '' || strlen($nome) > 150 || !filter_var($email, FILTER_VALIDATE_EMAIL) || $senha === '') {
         $erro = 'Preencha nome, e-mail e senha de acesso do profissional.';
-    } elseif (strlen($senha) < 6) {
-        $erro = 'A senha deve ter no mínimo 6 caracteres.';
+    } elseif (strlen($senha) < 8 || strlen($senha) > 72) {
+        $erro = 'A senha deve ter entre 8 e 72 caracteres.';
     } else {
-        $check = $pdo->prepare('SELECT id FROM profissionais WHERE email = ?');
-        $check->execute([$email]);
+        $check = $pdo->prepare('SELECT id FROM profissionais WHERE company_id = ? AND email = ?');
+        $check->execute([$companyId, $email]);
         if ($check->fetch()) {
             $erro = 'Já existe um profissional cadastrado com esse e-mail.';
         } else {
             $hash = password_hash($senha, PASSWORD_DEFAULT);
             $stmt = $pdo->prepare('
-                INSERT INTO profissionais (company_id, nome, email, senha_hash, status)
-                VALUES (?, ?, ?, ?, "ativo")
+                INSERT INTO profissionais (company_id, nome, email, senha_hash, status, pode_gerenciar_agenda_geral)
+                VALUES (?, ?, ?, ?, "ativo", ?)
             ');
-            $stmt->execute([$companyId, $nome, $email, $hash]);
+            $stmt->execute([$companyId, $nome, $email, $hash, $podeGerenciarAgendaGeral]);
             $sucesso = 'Profissional cadastrado com sucesso. O acesso já pode ser utilizado.';
         }
+    }
+}
+
+// Alterar permissão de gerenciar agenda geral
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['acao'] ?? '') === 'alterar_permissao') {
+    $profId = (int) ($_POST['profissional_id'] ?? 0);
+    $novaPermissao = isset($_POST['nova_permissao']) ? 1 : 0;
+
+    if ($profId) {
+        $stmt = $pdo->prepare('UPDATE profissionais SET pode_gerenciar_agenda_geral = ? WHERE id = ? AND company_id = ?');
+        $stmt->execute([$novaPermissao, $profId, $companyId]);
+        $sucesso = 'Permissão atualizada.';
     }
 }
 
@@ -81,6 +98,7 @@ $profissionais = $profissionais->fetchAll();
     <h2 class="text-base font-bold text-gray-800 mb-4">Cadastrar novo profissional</h2>
     <form method="POST" class="grid grid-cols-1 md:grid-cols-3 gap-4">
       <input type="hidden" name="acao" value="criar_profissional">
+      <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(tokenCsrf(), ENT_QUOTES, 'UTF-8') ?>">
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">Nome completo *</label>
         <input type="text" name="nome" required class="w-full border rounded px-3 py-2">
@@ -91,7 +109,13 @@ $profissionais = $profissionais->fetchAll();
       </div>
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">Senha de acesso *</label>
-        <input type="password" name="senha" required minlength="6" class="w-full border rounded px-3 py-2">
+        <input type="password" name="senha" required minlength="8" maxlength="72" class="w-full border rounded px-3 py-2">
+      </div>
+      <div class="md:col-span-3 flex items-center gap-2">
+        <input type="checkbox" name="pode_gerenciar_agenda_geral" id="permGeral" class="rounded">
+        <label for="permGeral" class="text-sm text-gray-700">
+          Permitir que este profissional edite e marque horários de qualquer profissional na agenda
+        </label>
       </div>
       <div class="md:col-span-3">
         <button type="submit" class="bg-purple-600 text-white font-medium px-6 py-2 rounded hover:bg-purple-700 transition">
@@ -133,6 +157,7 @@ $profissionais = $profissionais->fetchAll();
               <td class="py-2 pr-4">
                 <form method="POST" class="inline">
                   <input type="hidden" name="acao" value="alterar_status">
+                  <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(tokenCsrf(), ENT_QUOTES, 'UTF-8') ?>">
                   <input type="hidden" name="profissional_id" value="<?= (int) $p['id'] ?>">
                   <input type="hidden" name="novo_status" value="<?= $p['status'] === 'ativo' ? 'inativo' : 'ativo' ?>">
                   <button type="submit" class="text-xs text-purple-600 hover:underline">

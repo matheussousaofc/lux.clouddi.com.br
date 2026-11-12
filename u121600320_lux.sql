@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1:3306
--- Tempo de geração: 11/11/2026 às 21:20
+-- Tempo de geração: 12/11/2026 às 20:13
 -- Versão do servidor: 11.8.9-MariaDB-log
 -- Versão do PHP: 7.2.34
 
@@ -20,6 +20,31 @@ SET time_zone = "+00:00";
 --
 -- Banco de dados: `u121600320_lux`
 --
+
+-- --------------------------------------------------------
+
+--
+-- Estrutura para tabela `agendamentos`
+--
+
+CREATE TABLE `agendamentos` (
+  `id` int(11) NOT NULL,
+  `company_id` int(11) NOT NULL,
+  `profissional_id` int(11) NOT NULL,
+  `servico_id` int(11) NOT NULL,
+  `cliente_id` int(11) NOT NULL,
+  `data_hora_inicio` datetime NOT NULL,
+  `data_hora_fim` datetime NOT NULL,
+  `status` enum('agendado','concluido','cancelado','no_show') NOT NULL DEFAULT 'agendado',
+  `criado_por_tipo` enum('owner','profissional') NOT NULL DEFAULT 'owner',
+  `criado_por_id` int(11) NOT NULL,
+  `criado_por_nome` varchar(150) NOT NULL,
+  `atualizado_por_tipo` enum('owner','profissional') DEFAULT NULL,
+  `atualizado_por_id` int(11) DEFAULT NULL,
+  `atualizado_por_nome` varchar(150) DEFAULT NULL,
+  `atualizado_em` datetime DEFAULT NULL,
+  `criado_em` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
 
 -- --------------------------------------------------------
 
@@ -112,6 +137,22 @@ CREATE TABLE `cash_transactions` (
 -- --------------------------------------------------------
 
 --
+-- Estrutura para tabela `clientes`
+--
+
+CREATE TABLE `clientes` (
+  `id` int(11) NOT NULL,
+  `company_id` int(11) NOT NULL,
+  `whatsapp` varchar(20) NOT NULL,
+  `nome_completo` varchar(150) NOT NULL,
+  `data_nascimento` date NOT NULL,
+  `cadastro_completo` tinyint(1) NOT NULL DEFAULT 0,
+  `criado_em` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Estrutura para tabela `clients`
 --
 
@@ -134,6 +175,7 @@ CREATE TABLE `clients` (
 CREATE TABLE `companies` (
   `id` int(11) NOT NULL,
   `nome_fantasia` varchar(160) NOT NULL,
+  `slug` varchar(80) DEFAULT NULL,
   `razao_social` varchar(160) DEFAULT NULL,
   `telefone` varchar(20) DEFAULT NULL,
   `email_contato` varchar(160) DEFAULT NULL,
@@ -151,8 +193,8 @@ CREATE TABLE `companies` (
 -- Despejando dados para a tabela `companies`
 --
 
-INSERT INTO `companies` (`id`, `nome_fantasia`, `razao_social`, `telefone`, `email_contato`, `foto`, `cpf`, `status_mensalidade`, `plano`, `valor_mensalidade`, `dia_vencimento`, `criado_em`, `ativo`) VALUES
-(1, 'Teste', 'Empresa teste', '38999148001', 'devmatheussousa@gmail.com', NULL, NULL, 'ativa', 'Mensal', 100.00, 10, '2026-11-11 14:45:44', 1);
+INSERT INTO `companies` (`id`, `nome_fantasia`, `slug`, `razao_social`, `telefone`, `email_contato`, `foto`, `cpf`, `status_mensalidade`, `plano`, `valor_mensalidade`, `dia_vencimento`, `criado_em`, `ativo`) VALUES
+(1, 'Teste', NULL, 'Empresa teste', '38999148001', 'devmatheussousa@gmail.com', NULL, NULL, 'ativa', 'Mensal', 100.00, 10, '2026-11-11 14:45:44', 1);
 
 -- --------------------------------------------------------
 
@@ -247,6 +289,42 @@ CREATE TABLE `professional_services` (
 -- --------------------------------------------------------
 
 --
+-- Estrutura para tabela `profissionais`
+--
+
+CREATE TABLE `profissionais` (
+  `id` int(11) NOT NULL,
+  `company_id` int(11) NOT NULL,
+  `nome` varchar(150) NOT NULL,
+  `email` varchar(150) NOT NULL,
+  `senha_hash` varchar(255) NOT NULL,
+  `status` enum('ativo','inativo') NOT NULL DEFAULT 'ativo',
+  `pode_gerenciar_agenda_geral` tinyint(1) NOT NULL DEFAULT 0,
+  `cpf` varchar(14) DEFAULT NULL,
+  `email_contato` varchar(150) DEFAULT NULL,
+  `endereco` varchar(255) DEFAULT NULL,
+  `foto_url` varchar(255) DEFAULT NULL,
+  `observacoes` text DEFAULT NULL,
+  `criado_em` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Estrutura para tabela `profissional_disponibilidade`
+--
+
+CREATE TABLE `profissional_disponibilidade` (
+  `id` int(11) NOT NULL,
+  `profissional_id` int(11) NOT NULL,
+  `dia_semana` tinyint(4) NOT NULL,
+  `hora_inicio` time NOT NULL,
+  `hora_fim` time NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_uca1400_ai_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Estrutura para tabela `services`
 --
 
@@ -280,6 +358,16 @@ CREATE TABLE `servicos` (
 --
 -- Índices para tabelas despejadas
 --
+
+--
+-- Índices de tabela `agendamentos`
+--
+ALTER TABLE `agendamentos`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `fk_agendamentos_company` (`company_id`),
+  ADD KEY `fk_agendamentos_servico` (`servico_id`),
+  ADD KEY `fk_agendamentos_cliente` (`cliente_id`),
+  ADD KEY `idx_profissional_horario` (`profissional_id`,`data_hora_inicio`,`data_hora_fim`);
 
 --
 -- Índices de tabela `appointments`
@@ -325,6 +413,13 @@ ALTER TABLE `cash_transactions`
   ADD KEY `criado_por` (`criado_por`);
 
 --
+-- Índices de tabela `clientes`
+--
+ALTER TABLE `clientes`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_cliente_whatsapp_empresa` (`company_id`,`whatsapp`);
+
+--
 -- Índices de tabela `clients`
 --
 ALTER TABLE `clients`
@@ -335,7 +430,8 @@ ALTER TABLE `clients`
 -- Índices de tabela `companies`
 --
 ALTER TABLE `companies`
-  ADD PRIMARY KEY (`id`);
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `slug` (`slug`);
 
 --
 -- Índices de tabela `company_settings`
@@ -373,6 +469,20 @@ ALTER TABLE `professional_services`
   ADD KEY `service_id` (`service_id`);
 
 --
+-- Índices de tabela `profissionais`
+--
+ALTER TABLE `profissionais`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_profissional_email_empresa` (`company_id`,`email`);
+
+--
+-- Índices de tabela `profissional_disponibilidade`
+--
+ALTER TABLE `profissional_disponibilidade`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `fk_disponibilidade_profissional` (`profissional_id`);
+
+--
 -- Índices de tabela `services`
 --
 ALTER TABLE `services`
@@ -389,6 +499,12 @@ ALTER TABLE `servicos`
 --
 -- AUTO_INCREMENT para tabelas despejadas
 --
+
+--
+-- AUTO_INCREMENT de tabela `agendamentos`
+--
+ALTER TABLE `agendamentos`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT de tabela `appointments`
@@ -418,6 +534,12 @@ ALTER TABLE `cash_registers`
 -- AUTO_INCREMENT de tabela `cash_transactions`
 --
 ALTER TABLE `cash_transactions`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT de tabela `clientes`
+--
+ALTER TABLE `clientes`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
@@ -451,6 +573,18 @@ ALTER TABLE `professionals`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT de tabela `profissionais`
+--
+ALTER TABLE `profissionais`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT de tabela `profissional_disponibilidade`
+--
+ALTER TABLE `profissional_disponibilidade`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT de tabela `services`
 --
 ALTER TABLE `services`
@@ -465,6 +599,15 @@ ALTER TABLE `servicos`
 --
 -- Restrições para tabelas despejadas
 --
+
+--
+-- Restrições para tabelas `agendamentos`
+--
+ALTER TABLE `agendamentos`
+  ADD CONSTRAINT `fk_agendamentos_cliente` FOREIGN KEY (`cliente_id`) REFERENCES `clientes` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_agendamentos_company` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_agendamentos_profissional` FOREIGN KEY (`profissional_id`) REFERENCES `profissionais` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_agendamentos_servico` FOREIGN KEY (`servico_id`) REFERENCES `servicos` (`id`) ON DELETE CASCADE;
 
 --
 -- Restrições para tabelas `appointments`
@@ -505,6 +648,12 @@ ALTER TABLE `cash_transactions`
   ADD CONSTRAINT `cash_transactions_ibfk_3` FOREIGN KEY (`criado_por`) REFERENCES `owner_users` (`id`);
 
 --
+-- Restrições para tabelas `clientes`
+--
+ALTER TABLE `clientes`
+  ADD CONSTRAINT `fk_clientes_company` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE CASCADE;
+
+--
 -- Restrições para tabelas `clients`
 --
 ALTER TABLE `clients`
@@ -534,6 +683,18 @@ ALTER TABLE `professionals`
 ALTER TABLE `professional_services`
   ADD CONSTRAINT `professional_services_ibfk_1` FOREIGN KEY (`professional_id`) REFERENCES `professionals` (`id`),
   ADD CONSTRAINT `professional_services_ibfk_2` FOREIGN KEY (`service_id`) REFERENCES `services` (`id`);
+
+--
+-- Restrições para tabelas `profissionais`
+--
+ALTER TABLE `profissionais`
+  ADD CONSTRAINT `fk_profissionais_company` FOREIGN KEY (`company_id`) REFERENCES `companies` (`id`) ON DELETE CASCADE;
+
+--
+-- Restrições para tabelas `profissional_disponibilidade`
+--
+ALTER TABLE `profissional_disponibilidade`
+  ADD CONSTRAINT `fk_disponibilidade_profissional` FOREIGN KEY (`profissional_id`) REFERENCES `profissionais` (`id`) ON DELETE CASCADE;
 
 --
 -- Restrições para tabelas `services`

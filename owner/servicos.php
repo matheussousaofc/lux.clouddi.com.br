@@ -7,22 +7,26 @@ $companyId = companyIdDoOwner();
 $erro = '';
 $sucesso = '';
 
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    exigirTokenCsrf();
+}
+
 // Criar serviço (sempre vinculado à empresa da sessão)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['acao'] ?? '') === 'criar') {
     $nome = trim($_POST['nome'] ?? '');
     $duracao = (int) ($_POST['duracao_min'] ?? 0);
-    $preco = (float) ($_POST['preco'] ?? 0);
+    $precoInformado = trim((string) ($_POST['preco'] ?? '0'));
+    $preco = filter_var($precoInformado, FILTER_VALIDATE_FLOAT);
     $categoria = trim($_POST['categoria'] ?? '');
-    $status = $_POST['status'] ?? 'ativo';
 
-    if ($nome === '' || $duracao <= 0) {
-        $erro = 'Informe nome e duração válidos.';
+    if ($nome === '' || $duracao <= 0 || $preco === false || $preco < 0) {
+        $erro = 'Informe nome, duração e preço válidos.';
     } else {
         $stmt = $pdo->prepare('
             INSERT INTO servicos (company_id, nome, duracao_min, preco, categoria, status)
-            VALUES (?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, "ativo")
         ');
-        $stmt->execute([$companyId, $nome, $duracao, $preco, $categoria ?: null, $status]);
+        $stmt->execute([$companyId, $nome, $duracao, $preco, $categoria ?: null]);
         $sucesso = 'Serviço cadastrado.';
     }
 }
@@ -38,12 +42,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['acao'] ?? '') === 'status'
     }
 }
 
-// Excluir (restringindo por company_id - isolamento garantido no backend)
+// Inativar para preservar agendamentos associados ao serviço.
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['acao'] ?? '') === 'excluir') {
     $id = (int) ($_POST['id'] ?? 0);
-    $stmt = $pdo->prepare('DELETE FROM servicos WHERE id = ? AND company_id = ?');
+    $stmt = $pdo->prepare('UPDATE servicos SET status = "inativo" WHERE id = ? AND company_id = ?');
     $stmt->execute([$id, $companyId]);
-    $sucesso = 'Serviço excluído.';
+    $sucesso = 'Serviço inativado; os agendamentos relacionados foram preservados.';
 }
 
 // Listagem SEMPRE filtrada pela empresa da sessão
@@ -77,6 +81,7 @@ $servicos = $stmt->fetchAll();
     <h2 class="text-base font-bold text-gray-800 mb-4">Novo serviço</h2>
     <form method="POST" class="grid grid-cols-1 md:grid-cols-2 gap-4">
       <input type="hidden" name="acao" value="criar">
+      <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(tokenCsrf(), ENT_QUOTES, 'UTF-8') ?>">
       <div>
         <label class="block text-sm font-medium text-gray-700 mb-1">Nome *</label>
         <input type="text" name="nome" required class="w-full border rounded px-3 py-2">
@@ -127,6 +132,7 @@ $servicos = $stmt->fetchAll();
               <td class="py-2 pr-4">
                 <form method="POST" class="inline">
                   <input type="hidden" name="acao" value="status">
+                  <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(tokenCsrf(), ENT_QUOTES, 'UTF-8') ?>">
                   <input type="hidden" name="id" value="<?= (int) $s['id'] ?>">
                   <select name="novo_status" class="border rounded px-2 py-1 text-xs" onchange="this.form.submit()">
                     <option value="ativo" <?= $s['status'] === 'ativo' ? 'selected' : '' ?>>Ativo</option>
@@ -135,10 +141,11 @@ $servicos = $stmt->fetchAll();
                 </form>
               </td>
               <td class="py-2 pr-4">
-                <form method="POST" class="inline" onsubmit="return confirm('Excluir este serviço?')">
+                <form method="POST" class="inline" onsubmit="return confirm('Inativar este serviço?')">
                   <input type="hidden" name="acao" value="excluir">
+                  <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(tokenCsrf(), ENT_QUOTES, 'UTF-8') ?>">
                   <input type="hidden" name="id" value="<?= (int) $s['id'] ?>">
-                  <button type="submit" class="text-red-600 hover:underline text-xs">Excluir</button>
+                  <button type="submit" class="text-red-600 hover:underline text-xs">Inativar</button>
                 </form>
               </td>
             </tr>

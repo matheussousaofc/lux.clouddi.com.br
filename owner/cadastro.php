@@ -6,12 +6,13 @@ $pdo = getDB();
 $erro = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    exigirTokenCsrf();
     $nome  = trim($_POST['nome'] ?? '');
     $email = trim($_POST['email'] ?? '');
     $senha = $_POST['senha'] ?? '';
 
-    if ($nome === '' || $email === '' || strlen($senha) < 6) {
-        $erro = 'Preencha nome, e-mail e senha (mínimo 6 caracteres).';
+    if ($nome === '' || strlen($nome) > 120 || !filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($senha) < 8 || strlen($senha) > 72) {
+        $erro = 'Informe nome, e-mail válido e senha com pelo menos 8 caracteres.';
     } else {
         $check = $pdo->prepare('SELECT id FROM owner_users WHERE email = ?');
         $check->execute([$email]);
@@ -24,6 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $pdo->prepare('INSERT INTO owner_users (company_id, nome, email, senha_hash) VALUES (NULL, ?, ?, ?)');
             $stmt->execute([$nome, $email, $hash]);
 
+            renovarSessaoAposLogin();
             $_SESSION['tipo']       = 'owner';
             $_SESSION['owner_id']   = (int) $pdo->lastInsertId();
             $_SESSION['nome']       = $nome;
@@ -51,6 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <?php endif; ?>
 
   <form method="POST" class="space-y-4">
+    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(tokenCsrf(), ENT_QUOTES, 'UTF-8') ?>">
     <div>
       <label class="block text-sm font-medium text-gray-700 mb-1">Nome</label>
       <input type="text" name="nome" required class="w-full border rounded px-3 py-2">
@@ -61,7 +64,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
     <div>
       <label class="block text-sm font-medium text-gray-700 mb-1">Senha</label>
-      <input type="password" name="senha" required minlength="6" class="w-full border rounded px-3 py-2">
+      <input type="password" name="senha" required minlength="8" maxlength="72" class="w-full border rounded px-3 py-2">
     </div>
     <button type="submit" class="w-full bg-purple-600 text-white font-medium py-2 rounded hover:bg-purple-700 transition">
       Criar conta

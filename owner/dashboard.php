@@ -25,6 +25,8 @@ $totalServicos = (int) $totalServicos->fetch()['total'];
   <h1 class="text-lg font-bold text-gray-800"><?= htmlspecialchars($empresa['nome_fantasia'] ?? 'Minha Empresa') ?></h1>
   <div class="flex items-center gap-4">
     <a href="/owner/servicos.php" class="text-sm text-purple-600 hover:underline">Serviços</a>
+    <a href="/owner/profissionais.php" class="text-sm text-purple-600 hover:underline">Profissionais</a>
+    <a href="/owner/agenda.php" class="text-sm text-purple-600 hover:underline">Agenda</a>
     <span class="text-sm text-gray-600">Olá, <?= htmlspecialchars($_SESSION['nome'] ?? '') ?></span>
     <a href="/includes/logout.php" class="text-sm text-red-600 hover:underline">Sair</a>
   </div>

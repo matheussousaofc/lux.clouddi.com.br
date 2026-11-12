@@ -6,6 +6,12 @@ function getDB(): PDO
     static $pdo = null;
 
     if ($pdo === null) {
+        if (DB_HOST === '' || DB_NAME === '' || DB_USER === '' || DB_PASS === '') {
+            error_log('Configuração do banco incompleta. Defina DB_HOST, DB_NAME, DB_USER e DB_PASS no ambiente do PHP ou no arquivo privado lux-erp-config.php.');
+            http_response_code(500);
+            exit('Erro interno. Tente novamente mais tarde.');
+        }
+
         try {
             $dsn = 'mysql:host=' . DB_HOST . ';dbname=' . DB_NAME . ';charset=utf8mb4';
             $pdo = new PDO($dsn, DB_USER, DB_PASS, [

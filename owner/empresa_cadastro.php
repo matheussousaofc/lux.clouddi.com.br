@@ -18,31 +18,58 @@ $pdo = getDB();
 $erro = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    exigirTokenCsrf();
     $nome     = trim($_POST['nome'] ?? '');
     $telefone = trim($_POST['telefone'] ?? '');
     $email    = trim($_POST['email'] ?? '');
     $cpf      = trim($_POST['cpf'] ?? '');
     $status   = $_POST['status'] ?? 'ativa';
 
-    if ($nome === '') {
+    if ($nome === '' || strlen($nome) > 160) {
         $erro = 'Informe o nome da empresa.';
+    } elseif ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $erro = 'Informe um e-mail válido para a empresa.';
+    } elseif (!in_array($status, ['ativa', 'atrasada', 'suspensa', 'cancelada'], true)) {
+        $erro = 'Status da empresa inválido.';
     } else {
         $fotoPath = null;
 
         if (!empty($_FILES['foto']['name'])) {
             $ext = strtolower(pathinfo($_FILES['foto']['name'], PATHINFO_EXTENSION));
             $permitidas = ['jpg', 'jpeg', 'png', 'webp'];
-            if (in_array($ext, $permitidas, true)) {
+            $erroUpload = $_FILES['foto']['error'] ?? UPLOAD_ERR_NO_FILE;
+            if ($erroUpload !== UPLOAD_ERR_OK) {
+                $erro = 'Não foi possível receber a imagem enviada.';
+            } elseif ($_FILES['foto']['size'] > 3 * 1024 * 1024) {
+                $erro = 'A imagem deve ter no máximo 3MB.';
+            } elseif (!in_array($ext, $permitidas, true)) {
+                $erro = 'Formato de imagem não suportado. Use JPG, PNG ou WEBP.';
+            } else {
+                $imagem = getimagesize($_FILES['foto']['tmp_name']);
+                $mimesPermitidos = [
+                    'jpg' => 'image/jpeg',
+                    'jpeg' => 'image/jpeg',
+                    'png' => 'image/png',
+                    'webp' => 'image/webp',
+                ];
+                if ($imagem === false || $imagem['mime'] !== $mimesPermitidos[$ext]) {
+                    $erro = 'O arquivo enviado não é uma imagem válida.';
+                }
+            }
+
+            if ($erro === '') {
                 $destDir = __DIR__ . '/../uploads/empresas/';
                 if (!is_dir($destDir)) {
-                    mkdir($destDir, 0755, true);
+                    if (!mkdir($destDir, 0755, true) && !is_dir($destDir)) {
+                        error_log('Não foi possível criar a pasta de fotos das empresas.');
+                    }
                 }
-                $nomeArquivo = 'empresa_' . time() . '_' . bin2hex(random_bytes(4)) . '.' . $ext;
-                if (move_uploaded_file($_FILES['foto']['tmp_name'], $destDir . $nomeArquivo)) {
+                $nomeArquivo = 'empresa_' . bin2hex(random_bytes(8)) . '.' . $ext;
+                if (is_dir($destDir) && move_uploaded_file($_FILES['foto']['tmp_name'], $destDir . $nomeArquivo)) {
                     $fotoPath = '/uploads/empresas/' . $nomeArquivo;
+                } else {
+                    $erro = 'Não foi possível salvar a imagem enviada.';
                 }
-            } else {
-                $erro = 'Formato de imagem não suportado. Use JPG, PNG ou WEBP.';
             }
         }
 
@@ -71,8 +98,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $_SESSION['company_id'] = $companyId;
                 header('Location: /owner/dashboard.php');
                 exit;
-            } catch (Exception $e) {
-                $pdo->rollBack();
+            } catch (Throwable $e) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
                 error_log('Erro ao cadastrar empresa: ' . $e->getMessage());
                 $erro = 'Erro ao salvar. Tente novamente.';
             }
@@ -97,6 +126,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <?php endif; ?>
 
   <form method="POST" enctype="multipart/form-data" class="space-y-4">
+    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(tokenCsrf(), ENT_QUOTES, 'UTF-8') ?>">
     <div>
       <label class="block text-sm font-medium text-gray-700 mb-1">Nome da empresa *</label>
       <input type="text" name="nome" required class="w-full border rounded px-3 py-2">

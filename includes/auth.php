@@ -1,21 +1,5 @@
 <?php
-// Conexão e controle de sessão/permissões do sistema
-
-function getDB(): PDO
-{
-    static $pdo = null;
-    if ($pdo === null) {
-        $host = 'localhost';
-        $db   = 'u121600320_lux';
-        $user = 'u121600320_admin3';     // ajuste conforme seu hPanel
-        $pass = '@Entw9gtk953157';         // ajuste conforme seu hPanel
-        $pdo = new PDO("mysql:host=$host;dbname=$db;charset=utf8mb4", $user, $pass, [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-        ]);
-    }
-    return $pdo;
-}
+require_once __DIR__ . '/db.php';
 
 function iniciarSessao(): void
 {
@@ -24,20 +8,49 @@ function iniciarSessao(): void
     }
 }
 
-/** Bloqueia acesso a quem não é master */
+function renovarSessaoAposLogin(): void
+{
+    iniciarSessao();
+    session_regenerate_id(true);
+    $_SESSION = [];
+}
+
+function tokenCsrf(): string
+{
+    iniciarSessao();
+    if (empty($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+
+    return $_SESSION['csrf_token'];
+}
+
+function validarTokenCsrf(): bool
+{
+    $token = $_POST['csrf_token'] ?? '';
+    return is_string($token)
+        && isset($_SESSION['csrf_token'])
+        && hash_equals($_SESSION['csrf_token'], $token);
+}
+
+function exigirTokenCsrf(): void
+{
+    iniciarSessao();
+    if (!validarTokenCsrf()) {
+        http_response_code(403);
+        exit('Requisição inválida. Atualize a página e tente novamente.');
+    }
+}
+
 function exigirMaster(): void
 {
     iniciarSessao();
     if (($_SESSION['tipo'] ?? '') !== 'master') {
-        header('Location: /master/login.php');
+        header('Location: login.php');
         exit;
     }
 }
 
-/**
- * Bloqueia acesso a quem não é proprietário logado.
- * Se logado mas sem empresa vinculada, redireciona ao cadastro da empresa.
- */
 function exigirOwner(): void
 {
     iniciarSessao();
@@ -51,38 +64,54 @@ function exigirOwner(): void
     }
 }
 
-/** Retorna o company_id do proprietário logado (isolamento de dados) */
 function companyIdDoOwner(): int
 {
     iniciarSessao();
     return (int) ($_SESSION['company_id'] ?? 0);
 }
 
+function loginMaster(string $email, string $senha): bool
+{
+    $pdo = getDB();
+    $stmt = $pdo->prepare('SELECT id, nome, email, senha_hash FROM master_users WHERE email = ? LIMIT 1');
+    $stmt->execute([trim($email)]);
+    $master = $stmt->fetch();
+
+    if (!$master || !password_verify($senha, $master['senha_hash'])) {
+        return false;
+    }
+
+    renovarSessaoAposLogin();
+    $_SESSION['tipo'] = 'master';
+    $_SESSION['master_id'] = (int) $master['id'];
+    $_SESSION['nome'] = $master['nome'];
+
+    return true;
+}
+
 function logout(): void
 {
     iniciarSessao();
+    $destino = ($_SESSION['tipo'] ?? '') === 'master'
+        ? '/master/login.php'
+        : (($_SESSION['tipo'] ?? '') === 'profissional' ? '/profissional/login.php' : '/owner/login.php');
+
     $_SESSION = [];
-    session_destroy();
-    header('Location: /index.php');
-    exit;
-}
 
-/** Autentica um usuário master e preenche a sessão. Retorna true/false. */
-function loginMaster(string $email, string $senha): bool
-{
-    iniciarSessao();
-    $pdo = getDB();
-
-    $stmt = $pdo->prepare('SELECT * FROM master_users WHERE email = ?');
-    $stmt->execute([$email]);
-    $master = $stmt->fetch();
-
-    if ($master && password_verify($senha, $master['senha_hash'])) {
-        $_SESSION['tipo']      = 'master';
-        $_SESSION['master_id'] = (int) $master['id'];
-        $_SESSION['nome']      = $master['nome'];
-        return true;
+    if (ini_get('session.use_cookies')) {
+        $parametros = session_get_cookie_params();
+        setcookie(
+            session_name(),
+            '',
+            time() - 42000,
+            $parametros['path'],
+            $parametros['domain'],
+            $parametros['secure'],
+            $parametros['httponly']
+        );
     }
 
-    return false;
+    session_destroy();
+    header('Location: ' . $destino);
+    exit;
 }

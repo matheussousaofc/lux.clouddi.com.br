@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lux ERP - Acesso</title>
+<script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 min-h-screen flex flex-col">
+
+  <header class="px-6 py-6 text-center">
+    <h1 class="text-xl font-bold text-gray-900">Clouddi ERP</h1>
+    <p class="text-sm text-gray-500 mt-1">Escolha como você deseja acessar o sistema</p>
+  </header>
+
+  <main class="flex-1 flex items-center justify-center px-6 pb-12">
+    <div class="w-full max-w-3xl grid grid-cols-1 md:grid-cols-2 gap-6">
+
+      <!-- Proprietário -->
+      <a href="/owner/login.php"
+        class="group bg-white border border-gray-200 rounded-2xl p-8 flex flex-col items-center text-center shadow-sm hover:shadow-md hover:border-purple-300 transition">
+        <div class="w-14 h-14 rounded-full bg-purple-50 flex items-center justify-center mb-5 group-hover:bg-purple-100 transition">
+          <svg class="w-7 h-7 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6" />
+          </svg>
+        </div>
+        <h2 class="text-base font-semibold text-gray-900 mb-2">Sou Proprietário</h2>
+        <p class="text-sm text-gray-500 mb-6">Gerencie sua empresa, equipe, serviços e caixa.</p>
+        <span class="text-sm font-medium text-purple-600 group-hover:underline">Entrar como proprietário →</span>
+      </a>
+
+      <!-- Profissional -->
+      <a href="/profissional/login.php"
+        class="group bg-white border border-gray-200 rounded-2xl p-8 flex flex-col items-center text-center shadow-sm hover:shadow-md hover:border-purple-300 transition">
+        <div class="w-14 h-14 rounded-full bg-purple-50 flex items-center justify-center mb-5 group-hover:bg-purple-100 transition">
+          <svg class="w-7 h-7 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14c-4.418 0-8 2.239-8 5v1h16v-1c0-2.761-3.582-5-8-5z" />
+          </svg>
+        </div>
+        <h2 class="text-base font-semibold text-gray-900 mb-2">Sou Profissional</h2>
+        <p class="text-sm text-gray-500 mb-6">Acesse sua agenda e gerencie seus atendimentos.</p>
+        <span class="text-sm font-medium text-purple-600 group-hover:underline">Entrar como profissional →</span>
+      </a>
+
+    </div>
+  </main>
+
+  <footer class="text-center text-xs text-gray-400 pb-6">
+    &copy; 2026 Clouddi ERP. Todos os direitos reservados.
+  </footer>
+
+</body>
+</html>

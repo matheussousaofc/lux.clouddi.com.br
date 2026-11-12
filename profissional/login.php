@@ -5,13 +5,14 @@ iniciarSessao();
 
 // Se já logado como profissional, vai direto para a agenda
 if (($_SESSION['tipo'] ?? '') === 'profissional') {
-    header('Location: /owner/agenda.php');
+    header('Location: /profissional/agenda.php');
     exit;
 }
 
 $erro = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    exigirTokenCsrf();
     $email = trim($_POST['email'] ?? '');
     $senha = $_POST['senha'] ?? '';
 
@@ -20,10 +21,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         $pdo = getDB();
         $stmt = $pdo->prepare('
-            SELECT p.*, c.nome_fantasia, c.status AS empresa_status
+            SELECT p.*, c.nome_fantasia, c.ativo AS empresa_ativa
             FROM profissionais p
             JOIN companies c ON c.id = p.company_id
             WHERE p.email = ?
+            LIMIT 1
         ');
         $stmt->execute([$email]);
         $prof = $stmt->fetch();
@@ -32,9 +34,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $erro = 'E-mail ou senha inválidos.';
         } elseif ($prof['status'] !== 'ativo') {
             $erro = 'Seu acesso está inativo. Fale com o responsável pelo estabelecimento.';
-        } elseif ($prof['empresa_status'] !== 'ativo') {
+        } elseif (!(int) $prof['empresa_ativa']) {
             $erro = 'O estabelecimento está inativo.';
         } else {
+            renovarSessaoAposLogin();
             $_SESSION['tipo']            = 'profissional';
             $_SESSION['profissional_id']  = $prof['id'];
             $_SESSION['company_id']       = $prof['company_id'];
@@ -64,6 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <?php endif; ?>
 
   <form method="POST" class="space-y-4">
+    <input type="hidden" name="csrf_token" value="<?= htmlspecialchars(tokenCsrf(), ENT_QUOTES, 'UTF-8') ?>">
     <div>
       <label class="block text-xs font-medium text-gray-600 mb-1">E-mail</label>
       <input type="email" name="email" required class="w-full border rounded px-3 py-2 text-sm" autofocus>
